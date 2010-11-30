@@ -4,6 +4,7 @@
 
 #include "push.h"
 #include "config.h" // defines FEED_ID and API_KEY
+#include "display.h"
 #include "util.h"
 
 #define INITIAL_INTERVAL 60000L // 1min
@@ -47,6 +48,8 @@ boolean sendPacket(int size) {
   client.print("\r\n");
   client.print(packet);
   boolean eoln = false;
+  char s[DISPLAY_LENGTH + 1];
+  byte i = 0;
   while (client.connected()) {
     if (client.available()) {
       char ch = client.read();
@@ -55,11 +58,17 @@ boolean sendPacket(int size) {
       if (ch == '\r' || ch == '\n') {
         eoln = true;
         Serial.println();
-      } else
+      } else {
         Serial.print(ch);
+        if (i < DISPLAY_LENGTH) 
+          s[i++] = ch;
+      }
     }
   }
-  if (!eoln)
+  if (eoln) {
+    s[i++] = 0;
+    updateDisplay(HTTP_STATUS, s);
+  } else
     Serial.println("No response");
   client.stop();
   return eoln;

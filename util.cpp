@@ -1,5 +1,7 @@
 #include "util.h"
 
+const char HEX_CHARS[17] = "0123456789ABCDEF";
+
 byte formatDecimal(int x, char* pos, byte size, byte fmt) {
   char sc = (fmt & FMT_SPACE) ? ' ' : '+';
   if (x < 0) {
