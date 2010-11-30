@@ -1,7 +1,12 @@
+#include <Metro.h>
+#include <SPI.h>
+#include <Client.h>
+#include <Ethernet.h>
 #include <LiquidCrystal.h>
 #include <OsReceiver.h>
 
 #include "util.h"
+#include "push.h"
 
 #define CONFIRM_DATA_LED 13
 
@@ -59,10 +64,13 @@ char* parseUnkn(byte* packet, byte len) {
 }
 
 char* parseTemp(byte* packet, byte len) {
+  byte ch = packet[4];
   int temp = 100 * packet[10] + 10 * packet[9] + packet[8];
   if (packet[11] != 0)
     temp = -temp;
   int humidity = 10 * packet[13] + packet[12];
+  push(PushItem(ch, temp, 1));
+  push(PushItem(ch + 10, humidity, 0));
 // boolean batteryOkay = (packet[7] & 0x4) == 0;
   formatDecimal(temp, &sTEMP[4], 5, 1 | FMT_SIGN);
   formatDecimal(humidity, &sTEMP[10], 2, FMT_SPACE);
@@ -74,6 +82,7 @@ char* parseRain(byte* packet, byte len) {
   long total = 100000L * packet[17] + 10000L * packet[16] + 1000 * packet[15] +
               100 * packet[14] + 10 * packet[13] + packet[12];
   int rate = 1000 * packet[11] + 100 * packet[10] + 10 * packet[9] + packet[8];
+  push(PushItem(21, rate, 1));
   formatDecimal(total, &sRAIN[4], 6, FMT_SPACE);
   formatDecimal(rate, &sRAIN[11], 3, FMT_SPACE);
   sRAIN[15] = STS_CHARS[packet[7]];
@@ -82,15 +91,19 @@ char* parseRain(byte* packet, byte len) {
 
 char* parseUvlt(byte* packet, byte len) {
   int uv = 10 * packet[9] + packet[8];
+  push(PushItem(22, uv, 0));
   formatDecimal(uv, &sUVLT[4], 2, FMT_SPACE);
   sUVLT[15] = STS_CHARS[packet[7]];
   return &sUVLT[0];
 }
 
 char* parseWind(byte* packet, byte len) {
+  int dir = packet[8];
   int avg = 100 * packet[16] + 10 * packet[15] + packet[14];
   int gust = 100 * packet[13] + 10 * packet[12] + packet[11];
-  int dir = packet[8];
+  push(PushItem(23, dir, 0));
+  push(PushItem(24, avg, 1));
+  push(PushItem(25, gust, 1));
   formatDecimal(avg, &sWIND[4], 3, FMT_SPACE);
   formatDecimal(gust, &sWIND[8], 3, FMT_SPACE);
   memcpy(&sWIND[12], WIND_DIR[dir], strlen(WIND_DIR[dir]));
@@ -174,12 +187,14 @@ void receiveWeatherData() {
 void setup() {
   Serial.begin(57600);
   lcd.begin(2, 16);
-  lcd.print("Welcome!");
+  lcd.print("WeatherCentral");
   initSensors();
   OsReceiver.init();  
+  initPush();
 }
 
 void loop() {
   receiveWeatherData();
+  checkPush();
 }
 
