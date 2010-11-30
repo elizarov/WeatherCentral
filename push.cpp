@@ -6,6 +6,12 @@
 #include "config.h" // defines FEED_ID and API_KEY
 #include "util.h"
 
+#define INITIAL_INTERVAL 60000L // 1min
+#define RETRY_INTERVAL   10000L // 10sec
+#define NEXT_INTERVAL   300000L // 5min
+
+#define MAX_PACKET 512
+
 byte mac[] = {0xDE, 0xAD, 0xBE, 0xEF, 0xFE, 0xED};
 byte ip[] = {192, 168, 7, 40};
 byte gateway[] = {192, 168, 7, 1};	
@@ -14,25 +20,23 @@ byte server[] = {173, 203, 98, 29}; // api.pachube.com
 
 PushItem items[MAX_PUSH_ID];
 boolean updated[MAX_PUSH_ID];
-
-#define MAX_PACKET 512
-
+boolean sending[MAX_PUSH_ID];
+Metro pushPeriod(INITIAL_INTERVAL, true); 
 char packet[MAX_PACKET];
-
 Client client(server, 80);
-Metro pushPeriod(300000L, true); // 5min
 
 void initPush() {
   Ethernet.begin(mac, ip, gateway, subnet);
 }
 
-void sendPacket(int size) {
+boolean sendPacket(int size) {
   Serial.print("PUT ");  
   Serial.print(size, DEC);
   Serial.print(" bytes - ");
   if (!client.connect()) {
     Serial.println("Failed to connect");
-    return;
+    pushPeriod.interval(RETRY_INTERVAL);
+    return false;
   }
   client.print("PUT /v2/feeds/" FEED_ID ".csv HTTP/1.1\r\n");
   client.print("Host: api.pachube.com\r\n");
@@ -56,9 +60,11 @@ void sendPacket(int size) {
         Serial.print(ch);
     }
   }
-  if (!eoln) 
+  if (!eoln)
     Serial.println("No response");
   client.stop();
+  pushPeriod.interval(eoln ? NEXT_INTERVAL : RETRY_INTERVAL);
+  return eoln;
 }
 
 void checkPush() {
@@ -70,7 +76,7 @@ void checkPush() {
     int size = 0;
     for (; i < MAX_PUSH_ID && size < MAX_PACKET - 10; i++)
       if (updated[i]) {
-        updated[i] = false;
+        sending[i] = true;
         byte k = formatDecimal(items[i].id, &packet[size], 2, FMT_SPACE | FMT_LEFT);
         size += k;
         packet[size++] = ',';
@@ -81,7 +87,13 @@ void checkPush() {
     if (size == 0)
       return;  
     packet[size] = 0;  
-    sendPacket(size);
+    if (sendPacket(size)) {
+      for (byte j = 0; j < MAX_PUSH_ID; j++)
+        if (sending[j]) {
+          sending[j] = false;
+          updated[j] = false;
+        }
+    }
   }
 }
 
