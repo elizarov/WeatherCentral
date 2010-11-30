@@ -35,7 +35,6 @@ boolean sendPacket(int size) {
   Serial.print(" bytes - ");
   if (!client.connect()) {
     Serial.println("Failed to connect");
-    pushPeriod.interval(RETRY_INTERVAL);
     return false;
   }
   client.print("PUT /v2/feeds/" FEED_ID ".csv HTTP/1.1\r\n");
@@ -63,7 +62,6 @@ boolean sendPacket(int size) {
   if (!eoln)
     Serial.println("No response");
   client.stop();
-  pushPeriod.interval(eoln ? NEXT_INTERVAL : RETRY_INTERVAL);
   return eoln;
 }
 
@@ -87,13 +85,20 @@ void checkPush() {
     if (size == 0)
       return;  
     packet[size] = 0;  
-    if (sendPacket(size)) {
-      for (byte j = 0; j < MAX_PUSH_ID; j++)
-        if (sending[j]) {
-          sending[j] = false;
-          updated[j] = false;
-        }
+    if (!sendPacket(size)) {
+      // faled to send, will retry
+      for (byte j = 0; j <= i; j++)
+        sending[j] = false;
+      pushPeriod.interval(RETRY_INTERVAL);
+      return; 
     }
+    // Sent successfully
+    pushPeriod.interval(NEXT_INTERVAL);
+    for (byte j = 0; j <= i; j++)
+      if (sending[j]) {
+        sending[j] = false;
+        updated[j] = false;
+      }
   }
 }
 
