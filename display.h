@@ -7,7 +7,7 @@
 
 #define MAX_SENSORS 16
 
-#define UNKN_SENSOR 0
+#define UNKN_SENSOR 11
 #define RAIN_SENSOR 12
 #define UVLT_SENSOR 13
 #define WIND_SENSOR 14
@@ -15,6 +15,7 @@
 
 extern void initDisplay();
 extern void updateDisplay(byte sid, char* s);
+extern void checkDisplay();
 
 #endif
 

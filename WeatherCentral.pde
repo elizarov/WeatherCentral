@@ -47,6 +47,7 @@ void setup() {
 
 void loop() {
   receiveWeatherData();
+  checkDisplay();
   checkPush();
 }
 
