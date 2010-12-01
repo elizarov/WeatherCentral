@@ -24,9 +24,10 @@ char* crlf = "\r\n";
 Item items[MAX_PUSH_ID];
 char packet[MAX_PACKET];
 
-int composePacket(byte mask) {
+inline int composePacket(byte mask, boolean &next) {
   int size = 0;
-  for (byte i = 0; i < MAX_PUSH_ID && size < MAX_PACKET - 10; i++)
+  byte i = next;
+  for (; i < MAX_PUSH_ID && size < MAX_PACKET - 10; i++)
     if (items[i].updated & mask) {
       items[i].sending |= mask;
       byte k = formatDecimal(i, &packet[size], 2, FMT_SPACE | FMT_LEFT);
@@ -37,6 +38,7 @@ int composePacket(byte mask) {
       packet[size++] = '\n';
     }
   packet[size] = 0;  
+  next = i < MAX_PUSH_ID ? i : 0;
   return size;
 }
 
@@ -132,9 +134,9 @@ boolean PushDest::readResponse() {
 void PushDest::check(byte mask) {
   if (readResponse())
     return;
-  if (!_period.check())
+  if (_next == 0 && !_period.check())
     return;
-  int size = composePacket(mask);
+  int size = composePacket(mask, _next);
   if (size == 0)
     return;
   if (!sendPacket(size)) {

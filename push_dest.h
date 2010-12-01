@@ -21,6 +21,7 @@ private:
   Client _client;
   Metro _period; 
   
+  byte _next;
   boolean _sending;
   boolean _eoln;
   byte _responseSize;
