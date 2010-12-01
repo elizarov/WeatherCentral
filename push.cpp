@@ -13,15 +13,21 @@
 
 #define MAX_PACKET 512
 
+struct Item {
+  byte id;    // feed id
+  int val;    // value
+  byte prec;  // precision
+  boolean updated; 
+  boolean sending;
+};
+
 byte mac[] = {0xDE, 0xAD, 0xBE, 0xEF, 0xFE, 0xED};
 byte ip[] = {192, 168, 7, 40};
 byte gateway[] = {192, 168, 7, 1};	
 byte subnet[] = {255, 255, 255, 0};
 byte server[] = {173, 203, 98, 29}; // api.pachube.com 
 
-PushItem items[MAX_PUSH_ID];
-boolean updated[MAX_PUSH_ID];
-boolean sending[MAX_PUSH_ID];
+Item items[MAX_PUSH_ID];
 Metro pushPeriod(INITIAL_INTERVAL, true); 
 char packet[MAX_PACKET];
 Client client(server, 80);
@@ -82,8 +88,8 @@ void checkPush() {
     // Compose packet(s)
     int size = 0;
     for (; i < MAX_PUSH_ID && size < MAX_PACKET - 10; i++)
-      if (updated[i]) {
-        sending[i] = true;
+      if (items[i].updated) {
+        items[i].sending = true;
         byte k = formatDecimal(items[i].id, &packet[size], 2, FMT_SPACE | FMT_LEFT);
         size += k;
         packet[size++] = ',';
@@ -97,7 +103,7 @@ void checkPush() {
     if (!sendPacket(size)) {
       // faled to send, will retry
       for (byte j = 0; j <= i; j++)
-        sending[j] = false;
+        items[j].sending = false;
       pushPeriod.interval(RETRY_INTERVAL);
       return; 
     }
@@ -105,14 +111,15 @@ void checkPush() {
     pushPeriod.interval(NEXT_INTERVAL);
     for (byte j = 0; j <= i; j++)
       if (sending[j]) {
-        sending[j] = false;
-        updated[j] = false;
+        items[j].sending = false;
+        items[j].updated = false;
       }
   }
 }
 
-void push(const PushItem& item) {
-  items[item.id] = item;
-  updated[item.id] = true;
+void push(byte id, int val, byte prec) {
+  items[id].val = val;
+  items[id].prec = prec;
+  items[id].updated = true;
 }
 
