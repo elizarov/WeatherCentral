@@ -40,6 +40,7 @@ void receiveWeatherData() {
 
 void setup() {
   Serial.begin(57600);
+  Serial.println("WeatherCentral");
   initDisplay();
   initPush();
   OsReceiver.init();  

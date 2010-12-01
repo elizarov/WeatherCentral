@@ -5,7 +5,7 @@
 #include "display.h"
 #include "util.h"
 
-#define MAX_PACKET 512
+#define MAX_PACKET 128
 #define MASK_ALL 0xff
 
 struct Item {
@@ -63,12 +63,13 @@ PushDest::PushDest(byte ip0, byte ip1, byte ip2, byte ip3, int port, char* host,
 }
 
 boolean PushDest::sendPacket(int size) {
-  Serial.print("PUT ");  
+  Serial.print(_host);
+  Serial.print(": PUT ");  
   Serial.print(size, DEC);
-  Serial.print(" bytes to ");
-  Serial.println(_host);
+  Serial.println(" bytes");
   if (!_client.connect()) {
-    Serial.println("Failed to connect");
+    Serial.print(_host);
+    Serial.println(": Failed to connect");
     return false;
   }
   _client.print("PUT ");
@@ -87,50 +88,64 @@ boolean PushDest::sendPacket(int size) {
   _client.print(crlf);
   _client.print(crlf);
   _client.print(packet);
-  boolean eoln = false;
-  char s[DISPLAY_LENGTH + 1];
-  byte i = 0;
-  while (_client.connected()) {
-    if (_client.available()) {
+  _sending = true;
+  _eoln = false;
+  _responseSize = 0;
+  return true;
+}
+
+boolean PushDest::readResponse() {
+  if (!_sending)
+    return false;
+  if (_client.connected()) {
+    while (_client.available()) {
       char ch = _client.read();
-      if (eoln)
+      if (_eoln)
         continue;
       if (ch == '\r' || ch == '\n') {
-        eoln = true;
-        Serial.println();
+        _eoln = true;
       } else {
-        Serial.print(ch);
-        if (i < DISPLAY_LENGTH) 
-          s[i++] = ch;
+        if (_responseSize < MAX_RESPONSE) 
+          _response[_responseSize++] = ch;
       }
     }
+    if (_client.connected())
+      return true; // if still connected will read more
   }
-  if (eoln) {
-    s[i++] = 0;
-    updateDisplay(HTTP_STATUS, s);
-  } else
-    Serial.println("No response");
-  _client.stop();
-  return eoln;
+  if (_sending) {
+    _client.stop();
+    _sending = false;
+    Serial.print(_host);
+    Serial.print(": ");
+    if (_eoln) {
+      _response[_responseSize] = 0;
+      Serial.println(_response);
+      _response[DISPLAY_LENGTH] = 0;
+      updateDisplay(HTTP_STATUS, _response);
+    } else {
+      Serial.println("No response");
+    }
+  }
+  return false; // done with response
 }
 
 void PushDest::check(byte mask) {
+  if (readResponse())
+    return;
   if (!_period.check())
     return;
-  while (1) {  
-    int size = composePacket(mask);
-    if (size == 0)
-      return;
-    if (!sendPacket(size)) {
-      // faled to send, will retry
-      markSent(mask, false);
-      _period.interval(RETRY_INTERVAL);
-      return; 
-    }
-    // Sent successfully
-    markSent(mask, true);
-    _period.interval(NEXT_INTERVAL);
+  int size = composePacket(mask);
+  if (size == 0)
+    return;
+  if (!sendPacket(size)) {
+    // faled to send, will retry
+    markSent(mask, false);
+    _period.interval(RETRY_INTERVAL);
+    return; 
   }
+  // Sent successfully
+  markSent(mask, true);
+  _period.interval(NEXT_INTERVAL);
 }
 
 void initPush() {

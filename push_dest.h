@@ -9,6 +9,8 @@
 #define RETRY_INTERVAL   10000L // 10sec
 #define NEXT_INTERVAL   300000L // 5min
 
+#define MAX_RESPONSE 20
+
 class PushDest {
 private:  
   byte _ip[4];
@@ -18,8 +20,14 @@ private:
   
   Client _client;
   Metro _period; 
+  
+  boolean _sending;
+  boolean _eoln;
+  byte _responseSize;
+  char _response[MAX_RESPONSE + 1];
 
   boolean sendPacket(int size);  
+  boolean readResponse();
 public:
   PushDest(byte ip0, byte ip1, byte ip2, byte ip3, int port, char* host, char* url, char* auth);
   void check(byte mask);
