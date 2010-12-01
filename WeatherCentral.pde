@@ -9,6 +9,7 @@
 #include "parse.h"
 #include "push.h"
 #include "util.h"
+#include "print_p.h"
 
 // Serialize packet for WeatherStation Data Logger Software
 void serialize(byte* packet, byte len, byte version) {
@@ -40,7 +41,8 @@ void receiveWeatherData() {
 
 void setup() {
   Serial.begin(57600);
-  Serial.println("WeatherCentral");
+  print_P(Serial, PSTR("WeatherCentral"));
+  Serial.println();
   initDisplay();
   initPush();
   OsReceiver.init();  

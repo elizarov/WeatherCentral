@@ -14,9 +14,9 @@
 class PushDest {
 private:  
   byte _ip[4];
-  char* _host;
-  char* _url;
-  char* _auth;
+  const char* _host;
+  const char* _url;
+  const char* _auth;
   
   Client _client;
   Metro _period; 
@@ -30,7 +30,7 @@ private:
   boolean sendPacket(int size);  
   boolean readResponse();
 public:
-  PushDest(byte ip0, byte ip1, byte ip2, byte ip3, int port, char* host, char* url, char* auth);
+  PushDest(byte ip0, byte ip1, byte ip2, byte ip3, int port, const char* host, const char* url, const char* auth);
   void check(byte mask);
 };
 

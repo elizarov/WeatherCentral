@@ -4,8 +4,9 @@
 #include "push_dest.h"
 #include "display.h"
 #include "util.h"
+#include "print_p.h"
 
-#define MAX_PACKET 128
+#define MAX_PACKET 200
 #define MASK_ALL 0xff
 
 struct Item {
@@ -19,7 +20,6 @@ byte mac[] = {0xDE, 0xAD, 0xBE, 0xEF, 0xFE, 0xED};
 byte ip[] = {192, 168, 7, 40};
 byte gateway[] = {192, 168, 7, 1};	
 byte subnet[] = {255, 255, 255, 0};
-char* crlf = "\r\n";
 
 Item items[MAX_PUSH_ID];
 char packet[MAX_PACKET];
@@ -51,7 +51,7 @@ void markSent(byte mask, boolean success) {
     }
 }
 
-PushDest::PushDest(byte ip0, byte ip1, byte ip2, byte ip3, int port, char* host, char* url, char* auth) :
+PushDest::PushDest(byte ip0, byte ip1, byte ip2, byte ip3, int port, const char* host, const char* url, const char* auth) :
   _client(&_ip[0], port),
   _period(INITIAL_INTERVAL, true)
 {
@@ -66,29 +66,32 @@ PushDest::PushDest(byte ip0, byte ip1, byte ip2, byte ip3, int port, char* host,
 
 boolean PushDest::sendPacket(int size) {
   Serial.print(_host);
-  Serial.print(": PUT ");  
+  print_P(Serial, PSTR(": PUT "));  
   Serial.print(size, DEC);
-  Serial.println(" bytes");
+  print_P(Serial, PSTR(" bytes"));
+  Serial.println();
   if (!_client.connect()) {
     Serial.print(_host);
-    Serial.println(": Failed to connect");
+    print_P(Serial, PSTR(": Failed to connect"));
+    Serial.println();
     return false;
   }
-  _client.print("PUT ");
+  
+  print_P(_client, PSTR("PUT "));
   _client.print(_url);
-  _client.print(" HTTP/1.1");
-  _client.print(crlf);
-  _client.print("Host: ");
+  print_P(_client, PSTR(" HTTP/1.1"));
+  _client.println();
+  print_P(_client, PSTR("Host: "));
   _client.print(_host);
-  _client.print(crlf);
+  _client.println();
   _client.print(_auth);
-  _client.print(crlf);
-  _client.print("Connection: close");
-  _client.print(crlf);
-  _client.print("Content-Length: ");
+  _client.println();
+  print_P(_client, PSTR("Connection: close"));
+  _client.println();
+  print_P(_client, PSTR("Content-Length: "));
   _client.print(size, DEC);
-  _client.print(crlf);
-  _client.print(crlf);
+  _client.println();
+  _client.println();
   _client.print(packet);
   _sending = true;
   _eoln = false;
@@ -118,14 +121,14 @@ boolean PushDest::readResponse() {
     _client.stop();
     _sending = false;
     Serial.print(_host);
-    Serial.print(": ");
+    print_P(Serial, PSTR(": "));
     if (_eoln) {
       _response[_responseSize] = 0;
       Serial.println(_response);
       _response[DISPLAY_LENGTH] = 0;
       updateDisplay(HTTP_STATUS, _response);
     } else {
-      Serial.println("No response");
+      print_P(Serial, PSTR("No response\n"));
     }
   }
   return false; // done with response
