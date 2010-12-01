@@ -51,7 +51,7 @@ void markSent(byte mask, boolean success) {
     }
 }
 
-PushDest::PushDest(byte ip0, byte ip1, byte ip2, byte ip3, int port, const char* host, const char* url, const char* auth) :
+PushDest::PushDest(byte ip0, byte ip1, byte ip2, byte ip3, int port, PGM_P host, PGM_P url, PGM_P auth) :
   _client(&_ip[0], port),
   _period(INITIAL_INTERVAL, true)
 {
@@ -65,26 +65,26 @@ PushDest::PushDest(byte ip0, byte ip1, byte ip2, byte ip3, int port, const char*
 }
 
 boolean PushDest::sendPacket(int size) {
-  Serial.print(_host);
+  print_P(Serial, _host);
   print_P(Serial, PSTR(": PUT "));  
   Serial.print(size, DEC);
   print_P(Serial, PSTR(" bytes"));
   Serial.println();
   if (!_client.connect()) {
-    Serial.print(_host);
+    print_P(Serial, _host);
     print_P(Serial, PSTR(": Failed to connect"));
     Serial.println();
     return false;
   }
   
   print_P(_client, PSTR("PUT "));
-  _client.print(_url);
+  print_P(_client, _url);
   print_P(_client, PSTR(" HTTP/1.1"));
   _client.println();
   print_P(_client, PSTR("Host: "));
-  _client.print(_host);
+  print_P(_client, _host);
   _client.println();
-  _client.print(_auth);
+  print_P(_client, _auth);
   _client.println();
   print_P(_client, PSTR("Connection: close"));
   _client.println();
@@ -120,7 +120,7 @@ boolean PushDest::readResponse() {
   if (_sending) {
     _client.stop();
     _sending = false;
-    Serial.print(_host);
+    print_P(Serial, _host);
     print_P(Serial, PSTR(": "));
     if (_eoln) {
       _response[_responseSize] = 0;

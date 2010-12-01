@@ -1,6 +1,8 @@
 #ifndef PUSH_DEST_H
 #define PUSH_DEST_H
 
+#include <avr/pgmspace.h>
+
 #include <WProgram.h>
 #include <Client.h>
 #include <Metro.h>
@@ -14,9 +16,9 @@
 class PushDest {
 private:  
   byte _ip[4];
-  const char* _host;
-  const char* _url;
-  const char* _auth;
+  PGM_P _host;
+  PGM_P _url;
+  PGM_P _auth;
   
   Client _client;
   Metro _period; 
@@ -30,7 +32,7 @@ private:
   boolean sendPacket(int size);  
   boolean readResponse();
 public:
-  PushDest(byte ip0, byte ip1, byte ip2, byte ip3, int port, const char* host, const char* url, const char* auth);
+  PushDest(byte ip0, byte ip1, byte ip2, byte ip3, int port, PGM_P host, PGM_P url, PGM_P auth);
   void check(byte mask);
 };
 
