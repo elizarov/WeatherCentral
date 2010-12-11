@@ -7,7 +7,7 @@
 LiquidCrystal lcd(7, 9, 2, 3, 5, 6);
 
 #define TIMEOUT (10 * 60000L) // 10 min
-#define ANIMATION_LENGTH 4 
+#define ANIMATION_LENGTH 2 
 
 struct Sensor {
   char code;
@@ -15,63 +15,15 @@ struct Sensor {
   long lastTime;
 };
 
-byte char1[8] = {
-  B00000,
-  B11100,
-  B11000,
-  B10100,
-  B00010,
-  B00000,
-  B00000,
-  B00000
-};
-
-byte char2[8] = {
-  B00000,
-  B00111,
-  B00011,
-  B00101,
-  B01000,
-  B00000,
-  B00000,
-  B00000
-};
-
-byte char3[8] = {
-  B00000,
-  B00000,
-  B01000,
-  B00101,
-  B00011,
-  B00111,
-  B00000,
-  B00000
-};
-
-byte char4[8] = {
-  B00000,
-  B00000,
-  B00010,
-  B10100,
-  B11000,
-  B11100,
-  B00000,
-  B00000
-};
-
 Sensor sensor[MAX_SENSORS];
-Metro animationPeriod(250, true); 
-char animation[ANIMATION_LENGTH] = { 1, 2, 3, 4 };
+Metro animationPeriod(1000, true); 
+char animation[ANIMATION_LENGTH] = { ' ', '.' };
 byte animationPos;
 
 void initDisplay() {
   lcd.begin(2, 16);
   lcd.print("WeatherCentral");
-  lcd.createChar(1, char1);
-  lcd.createChar(2, char2);
-  lcd.createChar(3, char3);
-  lcd.createChar(4, char4);
-  for (byte i = 1; i < MAX_SENSORS; i++)
+  for (byte i = TEMP_SENSOR_1; i <= TEMP_SENSOR_MAX; i++)
     sensor[i].code = HEX_CHARS[i];
   sensor[UNKN_SENSOR].code = '?';  
   sensor[RAIN_SENSOR].code = 'R';  

@@ -7,6 +7,9 @@
 
 #define MAX_SENSORS 16
 
+#define TEMP_SENSOR_1   1
+#define TEMP_SENSOR_MAX 9
+
 #define UNKN_SENSOR 11
 #define RAIN_SENSOR 12
 #define UVLT_SENSOR 13
