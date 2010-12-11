@@ -21,6 +21,8 @@ byte ip[] = {192, 168, 7, 40};
 byte gateway[] = {192, 168, 7, 1};	
 byte subnet[] = {255, 255, 255, 0};
 
+const char HTTP_OK[] PROGMEM = "HTTP/1.1 200 OK";
+
 Item items[MAX_PUSH_ID];
 char packet[MAX_PACKET];
 
@@ -51,10 +53,12 @@ void markSent(byte mask, boolean success) {
     }
 }
 
-PushDest::PushDest(byte ip0, byte ip1, byte ip2, byte ip3, int port, PGM_P host, PGM_P url, PGM_P auth) :
+PushDest::PushDest(byte mask, byte ip0, byte ip1, byte ip2, byte ip3, int port, PGM_P host, PGM_P url, PGM_P auth) :
   _client(&_ip[0], port),
-  _period(INITIAL_INTERVAL, true)
+  _period(INITIAL_INTERVAL),
+  _timeout(PUSH_TIMEOUT)
 {
+  _mask = mask;
   _ip[0] = ip0;
   _ip[1] = ip1;
   _ip[2] = ip2;
@@ -93,16 +97,23 @@ boolean PushDest::sendPacket(int size) {
   _client.println();
   _client.println();
   _client.print(packet);
+  _timeout.reset();
   _sending = true;
   _eoln = false;
   _responseSize = 0;
   return true;
 }
 
+void PushDest::doneSend(boolean success) {
+  markSent(_mask, success);
+  _period.interval(success ? NEXT_INTERVAL : RETRY_INTERVAL);
+  _period.reset();
+}
+
 boolean PushDest::readResponse() {
   if (!_sending)
     return false;
-  if (_client.connected()) {
+  if (_client.connected() && !_timeout.check()) {
     while (_client.available()) {
       char ch = _client.read();
       if (_eoln)
@@ -117,40 +128,35 @@ boolean PushDest::readResponse() {
     if (_client.connected())
       return true; // if still connected will read more
   }
-  if (_sending) {
-    _client.stop();
-    _sending = false;
-    print_P(Serial, _host);
-    print_P(Serial, PSTR(": "));
-    if (_eoln) {
-      _response[_responseSize] = 0;
-      Serial.println(_response);
-      _response[DISPLAY_LENGTH] = 0;
-      updateDisplay(HTTP_STATUS, _response);
-    } else {
-      print_P(Serial, PSTR("No response\n"));
-    }
+  // not connected anymore or timeout
+  _client.stop();
+  _sending = false;
+  boolean ok = false;
+  print_P(Serial, _host);
+  print_P(Serial, PSTR(": "));
+  if (_eoln) {
+    _response[_responseSize] = 0;
+    ok = strcmp_P(_response, HTTP_OK) == 0;
+    Serial.println(_response);
+    _response[DISPLAY_LENGTH] = 0;
+    updateDisplay(HTTP_STATUS, _response);
+  } else {
+    print_P(Serial, PSTR("No response\n"));
   }
+  doneSend(ok);
   return false; // done with response
 }
 
-void PushDest::check(byte mask) {
+void PushDest::check() {
   if (readResponse())
     return;
   if (_next == 0 && !_period.check())
     return;
-  int size = composePacket(mask, _next);
+  int size = composePacket(_mask, _next);
   if (size == 0)
     return;
-  if (!sendPacket(size)) {
-    // faled to send, will retry
-    markSent(mask, false);
-    _period.interval(RETRY_INTERVAL);
-    return; 
-  }
-  // Sent successfully
-  markSent(mask, true);
-  _period.interval(NEXT_INTERVAL);
+  if (!sendPacket(size))
+    doneSend(false);
 }
 
 void initPush() {
@@ -158,8 +164,8 @@ void initPush() {
 }
 
 void checkPush() {
-  pachube.check(0x01);
-  haworks.check(0x02);
+  pachube.check();
+  haworks.check();
 }
 
 void push(byte id, int val, byte prec) {

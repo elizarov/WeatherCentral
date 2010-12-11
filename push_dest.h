@@ -11,10 +11,13 @@
 #define RETRY_INTERVAL   10000L // 10sec
 #define NEXT_INTERVAL   300000L // 5min
 
+#define PUSH_TIMEOUT     30000L // 30sec
+
 #define MAX_RESPONSE 20
 
 class PushDest {
 private:  
+  byte _mask;
   byte _ip[4];
   PGM_P _host;
   PGM_P _url;
@@ -22,6 +25,7 @@ private:
   
   Client _client;
   Metro _period; 
+  Metro _timeout;
   
   byte _next;
   boolean _sending;
@@ -31,9 +35,10 @@ private:
 
   boolean sendPacket(int size);  
   boolean readResponse();
+  void doneSend(boolean success);
 public:
-  PushDest(byte ip0, byte ip1, byte ip2, byte ip3, int port, PGM_P host, PGM_P url, PGM_P auth);
-  void check(byte mask);
+  PushDest(byte mask, byte ip0, byte ip1, byte ip2, byte ip3, int port, PGM_P host, PGM_P url, PGM_P auth);
+  void check();
 };
 
 // both are declared in push_config.cpp
