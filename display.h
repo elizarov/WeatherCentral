@@ -16,7 +16,7 @@
 #define WIND_SENSOR 14
 #define HTTP_STATUS 15
 
-extern void initDisplay();
+extern void setupDisplay();
 extern void updateDisplay(byte sid, char* s);
 extern void checkDisplay();
 

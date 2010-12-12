@@ -20,7 +20,7 @@ Metro animationPeriod(1000, true);
 char animation[ANIMATION_LENGTH] = { ' ', '.' };
 byte animationPos;
 
-void initDisplay() {
+void setupDisplay() {
   lcd.begin(2, 16);
   lcd.print("WeatherCentral");
   for (byte i = TEMP_SENSOR_1; i <= TEMP_SENSOR_MAX; i++)

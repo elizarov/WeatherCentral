@@ -5,7 +5,7 @@
 
 #define MAX_PUSH_ID 30
 
-extern void initPush();
+extern void setupPush();
 extern void checkPush();
 extern void push(byte id, int val, byte prec);
 

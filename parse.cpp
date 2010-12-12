@@ -119,5 +119,8 @@ void parsePacket(byte* packet, byte len) {
     parseUnkn(packet, len);
   }  
   updateDisplay(sid, s);
+  Serial.print('[');
+  Serial.print(s);
+  Serial.println(']');
 }
 

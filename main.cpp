@@ -1,3 +1,4 @@
+#include <avr/pgmspace.h>
 #include <WProgram.h>
 #include <OsReceiver.h>
 
@@ -6,6 +7,10 @@
 #include "push.h"
 #include "util.h"
 #include "print_p.h"
+#include "command.h"
+#include "msgbuf.h"
+
+const char BANNER[] PROGMEM = "<WeatherCentral>";
 
 // Serialize packet for WeatherStation Data Logger Software
 void serialize(byte* packet, byte len, byte version) {
@@ -36,11 +41,13 @@ void receiveWeatherData() {
 }
 
 void setup() {
+  delay(500); // wait 0.5s (make sure XBee on serial port starts)
   Serial.begin(57600);
-  print_P(Serial, PSTR("WeatherCentral"));
-  Serial.println();
-  initDisplay();
-  initPush();
+  print_P(Serial, BANNER);
+  Serial.println('*');
+  setupDisplay();
+  setupPush();
+  MsgBuf.putMessage_P(BANNER);
   OsReceiver.init();  
 }
 
@@ -48,5 +55,6 @@ void loop() {
   receiveWeatherData();
   checkDisplay();
   checkPush();
+  checkCommand();
 }
 
