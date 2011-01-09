@@ -3,7 +3,7 @@
 
 #include <WProgram.h>
 
-#define MAX_PUSH_ID 30
+#define MAX_PUSH_ID 40
 
 extern void setupPush();
 extern void checkPush();

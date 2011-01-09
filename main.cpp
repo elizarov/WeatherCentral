@@ -10,7 +10,7 @@
 #include "command.h"
 #include "msgbuf.h"
 
-const char BANNER[] PROGMEM = "<WeatherCentral>";
+const char BANNER[] PROGMEM = "{W:WeatherCentral started}";
 
 // Serialize packet for WeatherStation Data Logger Software
 void serialize(byte* packet, byte len, byte version) {

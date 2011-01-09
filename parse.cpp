@@ -88,39 +88,26 @@ void parsePacket(byte* packet, byte len) {
   int id = (packet[0] << 12) | (packet[1] << 8) | (packet[2] << 4) | packet[3];
   byte ch = packet[4];
   byte rc = (packet[5] << 4) | packet[6];
-  byte sid;
   switch (id) {
   case 0xF824: // THGR810
   case 0xF8B4: // THGR810 (in the anemometer)
   case 0x1D20: // THGR122NX and THGN123N
-    if (ch >= TEMP_SENSOR_1 && ch <= TEMP_SENSOR_MAX) {
-      sid = ch;
-    } else {
-      sid = UNKN_SENSOR;
-    }
     parseTemp(packet, len);
     break;
   case 0x2914: // Rain Bucket
-    sid = RAIN_SENSOR;
     parseRain(packet, len);
     break;
   case 0xD874: // UVN800
   case 0xEC70: // UVR123
-    sid = UVLT_SENSOR;
     parseUvlt(packet, len);
     break;    
   case 0x1984: // Wind (Anemometer)
   case 0x1994:
-    sid = WIND_SENSOR;
     parseWind(packet, len);
     break;
   default:
-    sid = UNKN_SENSOR;
     parseUnkn(packet, len);
   }  
-  updateDisplay(sid, s);
-  Serial.print('[');
-  Serial.print(s);
-  Serial.println(']');
+  updateDisplay(s);
 }
 

@@ -1,16 +1,18 @@
 #include <LiquidCrystal.h>
 #include <Metro.h>
+#include <avr/pgmspace.h>
 
 #include "display.h"
 #include "util.h"
 
 LiquidCrystal lcd(7, 9, 2, 3, 5, 6);
 
+const char SENSOR_CODES[] PROGMEM = " 123456789?CRUWH";
+
 #define TIMEOUT (10 * 60000L) // 10 min
 #define ANIMATION_LENGTH 2 
 
 struct Sensor {
-  char code;
   boolean seen;
   long lastTime;
 };
@@ -23,25 +25,31 @@ byte animationPos;
 void setupDisplay() {
   lcd.begin(2, 16);
   lcd.print("WeatherCentral");
-  for (byte i = TEMP_SENSOR_1; i <= TEMP_SENSOR_MAX; i++)
-    sensor[i].code = HEX_CHARS[i];
-  sensor[UNKN_SENSOR].code = '?';  
-  sensor[RAIN_SENSOR].code = 'R';  
-  sensor[UVLT_SENSOR].code = 'U';
-  sensor[WIND_SENSOR].code = 'W';
-  sensor[HTTP_STATUS].code = '*';
 }
 
 char sStatus[MAX_SENSORS + 1];
 
-void updateDisplay(byte sid, char* s) {
+void updateDisplay(char* s) {
+  // echo to console
+  Serial.print('[');
+  Serial.print(s);
+  Serial.println(']');
+  // find sensor id
+  char scode = s[0];
+  byte sid;
+  for (sid = 0; sid < MAX_SENSORS; sid++)
+    if (pgm_read_byte(&(SENSOR_CODES[sid])) == scode)
+      break;
+  if (sid >= MAX_SENSORS)
+    return;
   // prepare strings for display
   long time = millis();
   sensor[sid].seen = true;
   sensor[sid].lastTime = time;
+  // prepare status line
   sStatus[0] = animation[animationPos];
   for (byte i = 1; i < MAX_SENSORS; i++)
-    sStatus[i] = sensor[i].seen && time - sensor[i].lastTime < TIMEOUT ? sensor[i].code : ' ';
+    sStatus[i] = sensor[i].seen && time - sensor[i].lastTime < TIMEOUT ? pgm_read_byte(&(SENSOR_CODES[i])) : ' ';
   // display  
   lcd.setCursor(0, 0);
   lcd.print(s);

@@ -22,6 +22,7 @@ byte ip[] = {192, 168, 7, 40};
 byte gateway[] = {192, 168, 7, 1};	
 byte subnet[] = {255, 255, 255, 0};
 
+const char HTTP_RES[] PROGMEM = "HTTP/1.1";
 const char HTTP_OK[] PROGMEM = "HTTP/1.1 200 OK";
 const char PUT[] PROGMEM = "PUT";
 const char POST[] PROGMEM = "POST";
@@ -87,7 +88,9 @@ boolean PushDest::sendPacket(byte size) {
   Serial.print(' ');
   Serial.print(size, DEC);
   print_P(Serial, PSTR(" bytes"));
+  Serial.println();
   if (!_client.connect()) {
+    print_P(Serial, _host);
     print_P(Serial, PSTR(": Failed to connect"));
     Serial.println();
     return false;
@@ -129,7 +132,6 @@ boolean PushDest::sendPacket(byte size) {
   _sending = true;
   _eoln = false;
   _responseSize = 0;
-  Serial.println(); // done sending
   return true;
 }
 
@@ -165,16 +167,15 @@ boolean PushDest::readResponse() {
   _client.stop();
   _sending = false;
   boolean ok = false;
-  print_P(Serial, _host);
-  print_P(Serial, PSTR(": "));
-  if (_eoln) {
+  if (_eoln && strncmp_P(_response, HTTP_RES, strlen_P(HTTP_RES)) == 0) {
     _response[_responseSize] = 0;
     ok = strcmp_P(_response, HTTP_OK) == 0;
-    Serial.println(_response);
     _response[DISPLAY_LENGTH] = 0;
-    updateDisplay(HTTP_STATUS, _response);
+    updateDisplay(_response);
   } else {
-    print_P(Serial, PSTR("No response\n"));
+    print_P(Serial, _host);
+    print_P(Serial, PSTR(": No response"));
+    Serial.println();
   }
   doneSend(ok);
   return false; // done with response
@@ -220,8 +221,6 @@ void PushMsgDest::printUrlParams() {
   if (_newsession) {
     _client.print(sep);
     print_P(_client, NEW_SESSION);
-    Serial.print(sep);
-    print_P(Serial, NEW_SESSION);
     sep = '&';
   } 
   _pstate = PSTATE_0;
@@ -233,8 +232,6 @@ void PushMsgDest::printExtraHeaders() {
   print_P(_client, PSTR("Cookie: "));
   _client.print(_cookie);
   _client.println();
-  Serial.print(' ');
-  Serial.print(_cookie);
 }
 
 void PushMsgDest::parseResponse(char ch) {
