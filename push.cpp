@@ -26,13 +26,26 @@ const char HTTP_RES[] PROGMEM = "HTTP/1.1";
 const char HTTP_OK[] PROGMEM = "HTTP/1.1 200 OK";
 const char PUT[] PROGMEM = "PUT";
 const char POST[] PROGMEM = "POST";
-const char NEW_SESSION[] PROGMEM = "newsession1";
 const char SET_COOKIE[] PROGMEM = "Set-Cookie: ";
 
-#define PSTATE_0          0 
-#define PSTATE_SET_COOKIE 12 // length of SET_COOKIE string
-#define PSTATE_ERR        PSTATE_SET_COOKIE + MAX_COOKIE_LEN
-#define PSTATE_DONE       PSTATE_ERR + 1
+#define RESPONSE_LINE1       0  // 1st line of response
+#define RESPONSE_HEADERS0    1  // response headers start of line; '\n' was seen
+#define RESPONSE_HEADERS1    2  // response headers; '\n\r' was seen
+#define RESPONSE_HEADERS_ANY 3  // response headers, mid of line
+#define RESPONSE_BODY        4  // response body; '\n[\r]\n' was seen 
+
+#define PCOOKIE_STATE_0          0 
+#define PCOOKIE_STATE_SET_COOKIE 12 // length of SET_COOKIE string
+#define PCOOKIE_STATE_ERR        PCOOKIE_STATE_SET_COOKIE + MAX_COOKIE_LEN
+#define PCOOKIE_STATE_DONE       PCOOKIE_STATE_ERR + 1
+
+#define PBODY_STATE_0     0  // expect '2'
+#define PBODY_STATE_1     1  // expect ','
+#define PBODY_STATE_MSG   2  // reading message chars
+#define PBODY_STATE_WIDX  3  // wait for ',' to begin index
+#define PBODY_STATE_IDX   4  // parsing index
+#define PBODY_STATE_DONE  5  // successfully parsed
+#define PBODY_STATE_ERR   6  // error
 
 Item items[MAX_PUSH_ID];
 char packet[MAX_PACKET];
@@ -100,7 +113,7 @@ boolean PushDest::sendPacket(byte size) {
   print_P(_client, _method);
   _client.print(' ');
   print_P(_client, _url);
-  printUrlParams();
+  printExtraUrlParams();
   print_P(_client, PSTR(" HTTP/1.1"));
   _client.println();
   
@@ -130,7 +143,7 @@ boolean PushDest::sendPacket(byte size) {
   _client.print(packet);
   _timeout.reset();
   _sending = true;
-  _eoln = false;
+  _responsePart = RESPONSE_LINE1;
   _responseSize = 0;
   return true;
 }
@@ -142,15 +155,39 @@ void PushDest::doneSend(boolean success) {
 }
 
 void PushDest::parseChar(char ch) {
-  if (_eoln) {
-    parseResponse(ch);
-    return;
-  }
-  if (ch == '\r' || ch == '\n') {
-    _eoln = true;
-  } else {
-    if (_responseSize < MAX_RESPONSE) 
-      _response[_responseSize++] = ch;
+  switch (_responsePart) {
+  case RESPONSE_LINE1:
+    if (ch == '\n') {
+      _responsePart = RESPONSE_HEADERS0;
+    } else {
+      if (ch != '\r' && _responseSize < MAX_RESPONSE) 
+        _response[_responseSize++] = ch;
+    }
+    break;
+  case RESPONSE_HEADERS0:
+    if (ch == '\r')
+      _responsePart = RESPONSE_HEADERS1;
+    else if (ch == '\n')
+      _responsePart = RESPONSE_BODY;  
+    else
+      _responsePart = RESPONSE_HEADERS_ANY;  
+    parseResponseHeaders(ch);
+    break;
+  case RESPONSE_HEADERS1:
+    if (ch == '\n')
+      _responsePart = RESPONSE_BODY;
+    else
+      _responsePart = RESPONSE_HEADERS0;
+    parseResponseHeaders(ch);
+    break;
+  case RESPONSE_HEADERS_ANY:
+    if (ch == '\n')
+      _responsePart = RESPONSE_HEADERS0;
+    parseResponseHeaders(ch);
+    break;
+  case RESPONSE_BODY:
+    parseResponseBody(ch);
+    break;
   }
 }
 
@@ -167,7 +204,7 @@ boolean PushDest::readResponse() {
   _client.stop();
   _sending = false;
   boolean ok = false;
-  if (_eoln && strncmp_P(_response, HTTP_RES, strlen_P(HTTP_RES)) == 0) {
+  if (_responsePart != RESPONSE_LINE1 && strncmp_P(_response, HTTP_RES, strlen_P(HTTP_RES)) == 0) {
     _response[_responseSize] = 0;
     ok = strcmp_P(_response, HTTP_OK) == 0;
     _response[DISPLAY_LENGTH] = 0;
@@ -196,7 +233,7 @@ void PushDest::check() {
 PushMsgDest::PushMsgDest(byte mask, byte ip0, byte ip1, byte ip2, byte ip3, int port, PGM_P host, PGM_P url, PGM_P auth) :
     PushDest(mask, ip0, ip1, ip2, ip3, port, host, url, auth) 
 {
-  _newsession = true;
+  _newSession = true;
   _wait = true;
   _period.interval(INITIAL_MSG_WAIT); // need to wait for Ethernet to initialize
   _method = POST;
@@ -204,11 +241,16 @@ PushMsgDest::PushMsgDest(byte mask, byte ip0, byte ip1, byte ip2, byte ip3, int 
 
 void PushMsgDest::doneSend(boolean success) {
   if (success) {
-    if (_newsession) {
-      _newsession = false;
-      _index = 0; 
+    if (_newSession) {
+      _newSession = false;
+      _indexOut = 0; 
     } else  
-      MsgBuf.removeMessages(_index);
+      MsgBuf.removeMessages(_indexOut);
+    if (_parseBodyState != PBODY_STATE_DONE)
+      _indexIn = 0; // reset incoming index if message was not properly parsed
+    _wait = false; // no forced wait
+    _period.interval(POLL_MSG_INTERVAL);
+    _period.reset();  
   } else {
     _wait = true;
     _period.interval(RETRY_INTERVAL);
@@ -216,65 +258,100 @@ void PushMsgDest::doneSend(boolean success) {
   }  
 }
 
-void PushMsgDest::printUrlParams() {
-  char sep = '?';
-  if (_newsession) {
-    _client.print(sep);
-    print_P(_client, NEW_SESSION);
-    sep = '&';
-  } 
-  _pstate = PSTATE_0;
+void PushMsgDest::printExtraUrlParams() {
+  print_P(_client, PSTR("?id=2&last=1"));
+  if (_indexIn > 0) {
+    print_P(_client, PSTR("&index="));
+    _client.print(_indexIn, DEC);
+  }
+  if (_newSession)
+    print_P(_client, PSTR("&newsession1"));
+  _parseCookieState = PCOOKIE_STATE_0;
+  _parseBodyState = PBODY_STATE_0;
 }
 
 void PushMsgDest::printExtraHeaders() {
-  if (_newsession || _cookie[0] == 0)
+  if (_newSession || _cookie[0] == 0)
     return;
   print_P(_client, PSTR("Cookie: "));
   _client.print(_cookie);
   _client.println();
 }
 
-void PushMsgDest::parseResponse(char ch) {
+void PushMsgDest::parseResponseHeaders(char ch) {
   boolean eoln = ch == '\r' || ch == '\n';
-  if (_pstate < PSTATE_SET_COOKIE) {
+  if (_parseCookieState < PCOOKIE_STATE_SET_COOKIE) {
     if (eoln)
-      _pstate = PSTATE_0;
-    else if (ch == pgm_read_byte_near(SET_COOKIE + _pstate))
-      _pstate++;
+      _parseCookieState = PCOOKIE_STATE_0;
+    else if (ch == pgm_read_byte(SET_COOKIE + _parseCookieState))
+      _parseCookieState++;
     else
-      _pstate = PSTATE_ERR;  
-  } else if (_pstate < PSTATE_ERR) {
+      _parseCookieState = PCOOKIE_STATE_ERR;  
+  } else if (_parseCookieState < PCOOKIE_STATE_ERR) {
     if (eoln)
-      _pstate = PSTATE_DONE;
+      _parseCookieState = PCOOKIE_STATE_DONE;
     else {  
-      _cookie[_pstate - PSTATE_SET_COOKIE] = ch;
-      _pstate++;
-      _cookie[_pstate - PSTATE_SET_COOKIE] = 0;
+      _cookie[_parseCookieState - PCOOKIE_STATE_SET_COOKIE] = ch;
+      _parseCookieState++;
+      _cookie[_parseCookieState - PCOOKIE_STATE_SET_COOKIE] = 0;
     }
-  } else if (_pstate == PSTATE_ERR) {
+  } else if (_parseCookieState == PCOOKIE_STATE_ERR) {
     if (eoln) 
-      _pstate = PSTATE_0;
+      _parseCookieState = PCOOKIE_STATE_0;
   } // else PSTATE_DONE do nothing
+}
+
+void PushMsgDest::parseResponseBody(char ch) {
+  switch (_parseBodyState) {
+  case PBODY_STATE_0:
+    _parseBodyState = (ch == '2') ? PBODY_STATE_1 : PBODY_STATE_ERR;
+    break;  
+  case PBODY_STATE_1:
+    _parseBodyState = (ch == ',') ? PBODY_STATE_MSG : PBODY_STATE_ERR;
+    break;
+  case PBODY_STATE_MSG:
+    if (ch == ',') {
+      Serial.println();
+      _parseBodyState = PBODY_STATE_WIDX;
+    } else
+      Serial.print(ch);
+    break;
+  case PBODY_STATE_WIDX:
+    if (ch == ',') {
+      _parseBodyState = PBODY_STATE_IDX;
+      _indexIn = 0;
+    }
+    break;
+  case PBODY_STATE_IDX:
+    if (ch == '\r' || ch == '\n') {
+      _parseBodyState = PBODY_STATE_DONE;
+    } else if (ch >= '0' && ch <= '9') {
+      _indexIn *= 10;
+      _indexIn += ch - '0';
+    } else
+      _parseBodyState = PBODY_STATE_ERR;
+    break;      
+  }
 }
 
 void PushMsgDest::check() {
   if (readResponse())
     return;
   if (_wait && !_period.check())
-    return;
-  _wait = false;  
+    return; // we are in a 'forced wait' either on startup or after error
   byte index = 0;  
   byte size = MsgBuf.encodeMessages(&packet[0], MAX_PACKET, index);
-  if (size == 0)
+  // We return if we don't have outgoing message nor incoming messages to confirm nor periodic poll time
+  if (size == 0 && _indexIn == 0 && !_period.check())
     return;
-  if (index < _index) 
-    _newsession = true;
-  if (_newsession) { 
+  if (size > 0 && index < _indexOut) 
+    _newSession = true; // force new session for outgoing messages if index was reset
+  if (_newSession) { 
     // send empty message to create new session
     size = 0;
     packet[0] = 0;
   } else
-    _index = index;
+    _indexOut = index;
   if (!sendPacket(size))
     doneSend(false);
 }

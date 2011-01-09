@@ -7,11 +7,16 @@
 #include <Client.h>
 #include <Metro.h>
 
-#define INITIAL_MSG_WAIT  1000L // 1sec
-#define INITIAL_INTERVAL 60000L // 1min
+/* Data intervals */
+#define INITIAL_INTERVAL 60000L // 1min 
 #define RETRY_INTERVAL   10000L // 10sec
 #define NEXT_INTERVAL   300000L // 5min
 
+/* Message intervals */
+#define INITIAL_MSG_WAIT   3000L // 3sec
+#define POLL_MSG_INTERVAL 60000L // 1min
+
+/* Timeout for any HTTP interaction */
 #define PUSH_TIMEOUT     30000L // 30sec
 
 #define MAX_RESPONSE 20
@@ -32,17 +37,19 @@ protected:
   
   byte _next;
   boolean _sending;
-  boolean _eoln;
+  byte _responsePart;
   byte _responseSize;
   char _response[MAX_RESPONSE + 1];
 
   boolean sendPacket(byte size);  
   void parseChar(char ch);
   boolean readResponse();
+  
   virtual void doneSend(boolean success);
-  virtual void printUrlParams() {}
+  virtual void printExtraUrlParams() {}
   virtual void printExtraHeaders() {}
-  virtual void parseResponse(char ch) {}
+  virtual void parseResponseHeaders(char ch) {}
+  virtual void parseResponseBody(char ch) {}
 public:
   PushDest(byte mask, byte ip0, byte ip1, byte ip2, byte ip3, int port, PGM_P host, PGM_P url, PGM_P auth);
   void check();
@@ -50,15 +57,18 @@ public:
 
 class PushMsgDest : PushDest {
 protected:
-  byte _index;
-  boolean _newsession;
+  long _indexIn;
+  byte _indexOut;
+  boolean _newSession;
   char _cookie[MAX_COOKIE_LEN + 1];
-  byte _pstate;
+  byte _parseCookieState; // Parse Set-Cookie response header
+  byte _parseBodyState; // Parse response messages from body
   boolean _wait;
   virtual void doneSend(boolean success);
-  virtual void printUrlParams();
+  virtual void printExtraUrlParams();
   virtual void printExtraHeaders();
-  virtual void parseResponse(char ch);
+  virtual void parseResponseHeaders(char ch);
+  virtual void parseResponseBody(char ch);
 public:  
   PushMsgDest(byte mask, byte ip0, byte ip1, byte ip2, byte ip3, int port, PGM_P host, PGM_P url, PGM_P auth);
   void check();
