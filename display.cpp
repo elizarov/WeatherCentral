@@ -7,6 +7,9 @@
 
 LiquidCrystal lcd(7, 9, 2, 3, 5, 6);
 
+// current buffer string
+char displayBuf[DISPLAY_LENGTH+1];
+
 const char SENSOR_CODES[] PROGMEM = " 123456789?CRUWH";
 
 #define TIMEOUT (10 * 60000L) // 10 min

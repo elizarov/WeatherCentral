@@ -9,6 +9,7 @@
 #include "print_p.h"
 #include "command.h"
 #include "msgbuf.h"
+#include "bmp085.h"
 
 const char BANNER[] PROGMEM = "{W:WeatherCentral started}";
 
@@ -22,7 +23,7 @@ void serialize(byte* packet, byte len, byte version) {
   cPacket[dest++] = version + '0';
   cPacket[dest++] = ':';
 
-  for (int k = 1; k < len - 2 && k < sizeof(cPacket) - 2; k++)
+  for (byte k = 1; k + 2 < len && k + 2 < (byte)sizeof(cPacket); k++)
     cPacket[dest++] = HEX_CHARS[packet[k]];
   cPacket[dest++] = 0;
   Serial.println(cPacket);
@@ -48,7 +49,8 @@ void setup() {
   setupDisplay();
   setupPush();
   MsgBuf.putMessage_P(BANNER);
-  OsReceiver.init();  
+  OsReceiver.init();
+  setupBMP085();
 }
 
 void loop() {
@@ -56,5 +58,6 @@ void loop() {
   checkDisplay();
   checkPush();
   checkCommand();
+  checkBMP085();
 }
 

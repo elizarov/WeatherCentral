@@ -22,6 +22,8 @@ byte ip[] = {192, 168, 7, 40};
 byte gateway[] = {192, 168, 7, 1};	
 byte subnet[] = {255, 255, 255, 0};
 
+const char ETHERNET_RESET[] PROGMEM = "{W:Ethernet reset}";
+
 const char HTTP_RES[] PROGMEM = "HTTP/1.1";
 const char HTTP_OK[] PROGMEM = "HTTP/1.1 200 OK";
 const char PUT[] PROGMEM = "PUT";
@@ -47,8 +49,59 @@ const char SET_COOKIE[] PROGMEM = "Set-Cookie: ";
 #define PBODY_STATE_DONE  5  // successfully parsed
 #define PBODY_STATE_ERR   6  // error
 
+#define FAILURE_NORMAL   0
+#define FAILURE_SINGLE   1
+#define FAILURE_RESET    2
+#define FAILURE_REPEATED 3
+
+#define FAILURE_ETHERNET_RESET_TIMEOUT 60000L // 1 minute
+#define FAILURE_HARDWARE_RESET_TIMEOUT (60 * 60000L) // 1 hour
+
+#define HARDWARE_RESET_PIN A1
+
+byte failureStatus;
+long firstFailureTime;
+long lastFailureTime;
+
 Item items[MAX_PUSH_ID];
 char packet[MAX_PACKET];
+
+void updateFailureTime(boolean success) {
+  if (success) {
+    failureStatus = FAILURE_NORMAL;
+  } else if (failureStatus == FAILURE_NORMAL) {
+    failureStatus = FAILURE_SINGLE;
+    lastFailureTime = firstFailureTime = millis();
+  } else if (failureStatus == FAILURE_RESET) {
+    failureStatus = FAILURE_REPEATED;
+    lastFailureTime = millis();
+  }
+}
+
+inline void hardwareReset () {
+  pinMode(HARDWARE_RESET_PIN, OUTPUT);
+}
+
+inline void ethernetReset() {
+  print_P(Serial, ETHERNET_RESET);
+  if (failureStatus == FAILURE_SINGLE) {
+    MsgBuf.putMessage_P(ETHERNET_RESET);
+    Serial.println('*');
+  } else {
+    Serial.println();
+  }
+  failureStatus = FAILURE_RESET;
+  setupPush();
+}
+
+inline void checkFailure() {
+  if (failureStatus != FAILURE_SINGLE && failureStatus != FAILURE_REPEATED)
+    return;
+  if (millis() - firstFailureTime > FAILURE_HARDWARE_RESET_TIMEOUT)
+    hardwareReset();
+  if (millis() - lastFailureTime > FAILURE_ETHERNET_RESET_TIMEOUT)
+    ethernetReset();
+}
 
 inline byte composeDataPacket(byte mask, boolean &next) {
   byte size = 0;
@@ -94,6 +147,7 @@ PushDest::PushDest(byte mask, byte ip0, byte ip1, byte ip2, byte ip3, int port, 
 }
 
 boolean PushDest::sendPacket(byte size) {
+  checkFailure(); // reset ethernet module if needed
   print_P(Serial, _host);
   Serial.print(':');
   Serial.print(' ');
@@ -149,6 +203,7 @@ boolean PushDest::sendPacket(byte size) {
 }
 
 void PushDest::doneSend(boolean success) {
+  updateFailureTime(success);
   markSent(_mask, success);
   _period.interval(success ? NEXT_INTERVAL : RETRY_INTERVAL);
   _period.reset();
@@ -240,6 +295,7 @@ PushMsgDest::PushMsgDest(byte mask, byte ip0, byte ip1, byte ip2, byte ip3, int 
 }
 
 void PushMsgDest::doneSend(boolean success) {
+  updateFailureTime(success);
   if (success) {
     if (_newSession) {
       _newSession = false;
@@ -255,7 +311,7 @@ void PushMsgDest::doneSend(boolean success) {
     _wait = true;
     _period.interval(RETRY_INTERVAL);
     _period.reset();
-  }  
+  }
 }
 
 void PushMsgDest::printExtraUrlParams() {
