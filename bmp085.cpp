@@ -191,7 +191,7 @@ void bmp085Calibration()
 Metro bmp085Period(55000L); // 55 secs
 
 // POSITIONS            0123456789012345
-char sPRES[] PROGMEM = "P: -??.? ----   ";
+char sPRES[] PROGMEM = "P: -??.? ????.? ";
 
 void setupBMP085() {
   Wire.begin();
@@ -202,11 +202,11 @@ void checkBMP085() {
   if (!bmp085Period.check())
     return;
   int temperature = bmp085GetTemperature(bmp085ReadUT());
-  int pressure = (int)(bmp085GetPressure(bmp085ReadUP()) / 100);
+  int pressure = (int)(bmp085GetPressure(bmp085ReadUP()) / 10);
   push(28, temperature, 1);
-  push(29, pressure, 0);
+  push(29, pressure, 1);
   strcpy_P(displayBuf, sPRES);
   formatDecimal(temperature, &displayBuf[3], 5, 1 | FMT_SPACE);
-  formatDecimal(pressure, &displayBuf[9], 4, FMT_SPACE);
+  formatDecimal(pressure, &displayBuf[9], 6, 1 | FMT_SPACE);
   updateDisplay(displayBuf);
 }

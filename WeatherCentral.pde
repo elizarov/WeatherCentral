@@ -4,5 +4,6 @@
 #include <Ethernet.h>
 #include <LiquidCrystal.h>
 #include <OsReceiver.h>
+#include <Wire.h>
 
 
