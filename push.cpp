@@ -393,12 +393,13 @@ void PushMsgDest::parseResponseBody(char ch) {
 void PushMsgDest::check() {
   if (readResponse())
     return;
-  if (_wait && !_period.check())
+  boolean periodCheck = _period.check();
+  if (_wait && !periodCheck)
     return; // we are in a 'forced wait' either on startup or after error
   byte index = 0;  
   byte size = MsgBuf.encodeMessages(&packet[0], MAX_PACKET, index);
   // We return if we don't have outgoing message nor incoming messages to confirm nor periodic poll time
-  if (size == 0 && _indexIn == 0 && !_period.check())
+  if (size == 0 && _indexIn == 0 && !periodCheck)
     return;
   if (size > 0 && index < _indexOut) 
     _newSession = true; // force new session for outgoing messages if index was reset
