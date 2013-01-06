@@ -3,8 +3,8 @@
 #include "push.h"
 #include "push_dest.h"
 #include "display.h"
-#include "util.h"
-#include "print_p.h"
+#include "fmt_util.h"
+#include "xprint.h"
 #include "msgbuf.h"
 
 #define MAX_PACKET 200
@@ -17,10 +17,10 @@ struct Item {
   byte sending;
 };
 
-byte mac[] = {0xDE, 0xAD, 0xBE, 0xEF, 0xFE, 0xED};
-byte ip[] = {192, 168, 7, 40};
-byte gateway[] = {192, 168, 7, 1};	
-byte subnet[] = {255, 255, 255, 0};
+#define MAC_ADDR     {0xDE, 0xAD, 0xBE, 0xEF, 0xFE, 0xED}
+#define IP_ADDR      IPAddress(192, 168, 7, 40)
+#define GATEWAY_ADDR IPAddress(192, 168, 7, 1)
+#define SUBNET_ADDR  IPAddress(255, 255, 255, 0)
 
 const char ETHERNET_RESET[] PROGMEM = "{W:Ethernet reset}";
 
@@ -59,6 +59,15 @@ const char SET_COOKIE[] PROGMEM = "Set-Cookie: ";
 
 #define HARDWARE_RESET_PIN A1
 
+#define MAX_RESPONSE 20
+
+EthernetClient client;
+boolean clientBusy;
+
+byte responsePart;
+byte responseSize;
+char response[MAX_RESPONSE + 1];
+
 byte failureStatus;
 long firstFailureTime;
 long lastFailureTime;
@@ -83,7 +92,8 @@ inline void hardwareReset () {
 }
 
 inline void ethernetReset() {
-  print_P(Serial, ETHERNET_RESET);
+  waitPrint();
+  print_P(ETHERNET_RESET);
   if (failureStatus == FAILURE_SINGLE) {
     MsgBuf.putMessage_P(ETHERNET_RESET);
     Serial.println('*');
@@ -106,13 +116,13 @@ inline void checkFailure() {
 inline byte composeDataPacket(byte mask, boolean &next) {
   byte size = 0;
   byte i = next;
-  for (; i < MAX_PUSH_ID && size < MAX_PACKET - 10; i++)
+  for (; i < MAX_PUSH_ID && size < MAX_PACKET - 11; i++)
     if (items[i].updated & mask) {
       items[i].sending |= mask;
       byte k = formatDecimal(i, &packet[size], 2, FMT_SPACE | FMT_LEFT);
       size += k;
       packet[size++] = ',';
-      k = formatDecimal(items[i].val, &packet[size], 5, items[i].prec | FMT_SPACE | FMT_LEFT);
+      k = formatDecimal(items[i].val, &packet[size], 6, items[i].prec | FMT_SPACE | FMT_LEFT);
       size += k;
       packet[size++] = '\n';
     }
@@ -130,17 +140,13 @@ void markSent(byte mask, boolean success) {
     }
 }
 
-PushDest::PushDest(byte mask, byte ip0, byte ip1, byte ip2, byte ip3, int port, PGM_P host, PGM_P url, PGM_P auth) :
-  _client(&_ip[0], port),
+PushDest::PushDest(byte mask, char* host, int port, PGM_P url, PGM_P auth) :
   _period(INITIAL_INTERVAL),
   _timeout(PUSH_TIMEOUT)
 {
   _mask = mask;
-  _ip[0] = ip0;
-  _ip[1] = ip1;
-  _ip[2] = ip2;
-  _ip[3] = ip3;
   _host = host;
+  _port = port;
   _url = url;
   _auth = auth;
   _method = PUT;
@@ -148,57 +154,58 @@ PushDest::PushDest(byte mask, byte ip0, byte ip1, byte ip2, byte ip3, int port, 
 
 boolean PushDest::sendPacket(byte size) {
   checkFailure(); // reset ethernet module if needed
-  print_P(Serial, _host);
+  waitPrint();
+  Serial.print(_host);
   Serial.print(':');
   Serial.print(' ');
-  print_P(Serial, _method);  
+  print_P(_method);  
   Serial.print(' ');
   Serial.print(size, DEC);
-  print_P(Serial, PSTR(" bytes"));
+  print_P(PSTR(" bytes"));
   Serial.println();
-  if (!_client.connect()) {
-    print_P(Serial, _host);
-    print_P(Serial, PSTR(": Failed to connect"));
-    Serial.println();
+  if (!client.connect(_host, _port)) {
+    waitPrint();
+    Serial.print(_host);
+    print_P(PSTR(": Failed to connect\r\n"));
     return false;
   }
   
   // PUT/POST <url> HTTP/1.1
-  print_P(_client, _method);
-  _client.print(' ');
-  print_P(_client, _url);
+  print_P(client, _method);
+  client.print(' ');
+  print_P(client, _url);
   printExtraUrlParams();
-  print_P(_client, PSTR(" HTTP/1.1"));
-  _client.println();
+  print_P(client, PSTR(" HTTP/1.1"));
+  client.println();
   
   // Host: <host>
-  print_P(_client, PSTR("Host: "));
-  print_P(_client, _host);
-  _client.println();
+  print_P(client, PSTR("Host: "));
+  client.println(_host);
   
   // <auth>
-  print_P(_client, _auth);
-  _client.println();
+  print_P(client, _auth);
+  client.println();
   
   // extra stuff
   printExtraHeaders();
   
   // Connection: close
-  print_P(_client, PSTR("Connection: close"));
-  _client.println();
+  print_P(client, PSTR("Connection: close"));
+  client.println();
   
   // Content-Length: <size>
-  print_P(_client, PSTR("Content-Length: "));
-  _client.print(size, DEC);
-  _client.println();
+  print_P(client, PSTR("Content-Length: "));
+  client.print(size, DEC);
+  client.println();
   
   // empty line & packet itself
-  _client.println();
-  _client.print(packet);
+  client.println();
+  client.print(packet);
   _timeout.reset();
   _sending = true;
-  _responsePart = RESPONSE_LINE1;
-  _responseSize = 0;
+  responsePart = RESPONSE_LINE1;
+  responseSize = 0;
+  clientBusy = true;
   return true;
 }
 
@@ -210,34 +217,34 @@ void PushDest::doneSend(boolean success) {
 }
 
 void PushDest::parseChar(char ch) {
-  switch (_responsePart) {
+  switch (responsePart) {
   case RESPONSE_LINE1:
     if (ch == '\n') {
-      _responsePart = RESPONSE_HEADERS0;
+      responsePart = RESPONSE_HEADERS0;
     } else {
-      if (ch != '\r' && _responseSize < MAX_RESPONSE) 
-        _response[_responseSize++] = ch;
+      if (ch != '\r' && responseSize < MAX_RESPONSE) 
+        response[responseSize++] = ch;
     }
     break;
   case RESPONSE_HEADERS0:
     if (ch == '\r')
-      _responsePart = RESPONSE_HEADERS1;
+      responsePart = RESPONSE_HEADERS1;
     else if (ch == '\n')
-      _responsePart = RESPONSE_BODY;  
+      responsePart = RESPONSE_BODY;  
     else
-      _responsePart = RESPONSE_HEADERS_ANY;  
+      responsePart = RESPONSE_HEADERS_ANY;  
     parseResponseHeaders(ch);
     break;
   case RESPONSE_HEADERS1:
     if (ch == '\n')
-      _responsePart = RESPONSE_BODY;
+      responsePart = RESPONSE_BODY;
     else
-      _responsePart = RESPONSE_HEADERS0;
+      responsePart = RESPONSE_HEADERS0;
     parseResponseHeaders(ch);
     break;
   case RESPONSE_HEADERS_ANY:
     if (ch == '\n')
-      _responsePart = RESPONSE_HEADERS0;
+      responsePart = RESPONSE_HEADERS0;
     parseResponseHeaders(ch);
     break;
   case RESPONSE_BODY:
@@ -249,33 +256,36 @@ void PushDest::parseChar(char ch) {
 boolean PushDest::readResponse() {
   if (!_sending)
     return false;
-  if (_client.connected() && !_timeout.check()) {
-    while (_client.available()) 
-      parseChar(_client.read());
-    if (_client.connected())
+  if (client.connected() && !_timeout.check()) {
+    while (client.available()) 
+      parseChar(client.read());
+    if (client.connected())
       return true; // if still connected will read more
   }
   // not connected anymore or timeout
-  _client.stop();
+  client.stop();
   _sending = false;
   boolean ok = false;
-  if (_responsePart != RESPONSE_LINE1 && strncmp_P(_response, HTTP_RES, strlen_P(HTTP_RES)) == 0) {
-    _response[_responseSize] = 0;
-    ok = strcmp_P(_response, HTTP_OK) == 0;
-    _response[DISPLAY_LENGTH] = 0;
-    updateDisplay(_response);
+  if (responsePart != RESPONSE_LINE1 && strncmp_P(response, HTTP_RES, strlen_P(HTTP_RES)) == 0) {
+    response[responseSize] = 0;
+    ok = strcmp_P(response, HTTP_OK) == 0;
+    response[DISPLAY_LENGTH] = 0;
+    updateDisplay(response);
   } else {
-    print_P(Serial, _host);
-    print_P(Serial, PSTR(": No response"));
-    Serial.println();
+    waitPrint();
+    Serial.print(_host);
+    print_P(PSTR(": No response\r\n"));
   }
   doneSend(ok);
+  clientBusy = false;
   return false; // done with response
 }
 
 void PushDest::check() {
   if (readResponse())
-    return;
+    return; // reading response
+  if (clientBusy)
+    return; // client is busy serving some other destination 
   if (_next == 0 && !_period.check())
     return;
   byte size = composeDataPacket(_mask, _next);
@@ -285,8 +295,8 @@ void PushDest::check() {
     doneSend(false);
 }
 
-PushMsgDest::PushMsgDest(byte mask, byte ip0, byte ip1, byte ip2, byte ip3, int port, PGM_P host, PGM_P url, PGM_P auth) :
-    PushDest(mask, ip0, ip1, ip2, ip3, port, host, url, auth) 
+PushMsgDest::PushMsgDest(byte mask, char* host, int port, PGM_P url, PGM_P auth) :
+    PushDest(mask, host, port, url, auth) 
 {
   _newSession = true;
   _wait = true;
@@ -315,13 +325,13 @@ void PushMsgDest::doneSend(boolean success) {
 }
 
 void PushMsgDest::printExtraUrlParams() {
-  print_P(_client, PSTR("?id=2&last=1"));
+  print_P(client, PSTR("?id=2&last=1"));
   if (_indexIn > 0) {
-    print_P(_client, PSTR("&index="));
-    _client.print(_indexIn, DEC);
+    print_P(client, PSTR("&index="));
+    client.print(_indexIn, DEC);
   }
   if (_newSession)
-    print_P(_client, PSTR("&newsession1"));
+    print_P(client, PSTR("&newsession1"));
   _parseCookieState = PCOOKIE_STATE_0;
   _parseBodyState = PBODY_STATE_0;
 }
@@ -329,9 +339,9 @@ void PushMsgDest::printExtraUrlParams() {
 void PushMsgDest::printExtraHeaders() {
   if (_newSession || _cookie[0] == 0)
     return;
-  print_P(_client, PSTR("Cookie: "));
-  _client.print(_cookie);
-  _client.println();
+  print_P(client, PSTR("Cookie: "));
+  client.print(_cookie);
+  client.println();
 }
 
 void PushMsgDest::parseResponseHeaders(char ch) {
@@ -393,6 +403,8 @@ void PushMsgDest::parseResponseBody(char ch) {
 void PushMsgDest::check() {
   if (readResponse())
     return;
+  if (clientBusy)
+    return;  
   boolean periodCheck = _period.check();
   if (_wait && !periodCheck)
     return; // we are in a 'forced wait' either on startup or after error
@@ -414,7 +426,8 @@ void PushMsgDest::check() {
 }
 
 void setupPush() {
-  Ethernet.begin(mac, ip, gateway, subnet);
+  byte mac[] = MAC_ADDR;
+  Ethernet.begin(mac, IP_ADDR, GATEWAY_ADDR, GATEWAY_ADDR, SUBNET_ADDR); // DNS on gateway
 }
 
 void checkPush() {

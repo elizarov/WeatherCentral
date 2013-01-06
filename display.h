@@ -1,7 +1,7 @@
 #ifndef DISPLAY_H
 #define DISPLAY_H
 
-#include <WProgram.h>
+#include <Arduino.h>
 
 #define DISPLAY_LENGTH 16
 #define MAX_SENSORS 16

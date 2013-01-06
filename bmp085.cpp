@@ -2,11 +2,10 @@
 #include <Wire.h>
 #include <Metro.h>
 
-#include "print_p.h"
 #include "bmp085.h"
 #include "push.h"
 #include "display.h"
-#include "util.h"
+#include "fmt_util.h"
 
 #define BMP085_ADDRESS 0x77  // I2C address of BMP085
 
@@ -84,14 +83,14 @@ char bmp085Read(unsigned char address)
   unsigned char data;
 
   Wire.beginTransmission(BMP085_ADDRESS);
-  Wire.send(address);
+  Wire.write(address);
   Wire.endTransmission();
 
   Wire.requestFrom(BMP085_ADDRESS, 1);
   while(!Wire.available())
     ;
 
-  return Wire.receive();
+  return Wire.read();
 }
 
 // Read 2 bytes from the BMP085
@@ -102,14 +101,14 @@ int bmp085ReadInt(unsigned char address)
   unsigned char msb, lsb;
 
   Wire.beginTransmission(BMP085_ADDRESS);
-  Wire.send(address);
+  Wire.write(address);
   Wire.endTransmission();
 
   Wire.requestFrom(BMP085_ADDRESS, 2);
   while(Wire.available()<2)
     ;
-  msb = Wire.receive();
-  lsb = Wire.receive();
+  msb = Wire.read();
+  lsb = Wire.read();
 
   return (int) msb<<8 | lsb;
 }
@@ -122,8 +121,8 @@ unsigned int bmp085ReadUT()
   // Write 0x2E into Register 0xF4
   // This requests a temperature reading
   Wire.beginTransmission(BMP085_ADDRESS);
-  Wire.send(0xF4);
-  Wire.send(0x2E);
+  Wire.write(0xF4);
+  Wire.write(0x2E);
   Wire.endTransmission();
 
   // Wait at least 4.5ms
@@ -143,8 +142,8 @@ unsigned long bmp085ReadUP()
   // Write 0x34+(OSS<<6) into register 0xF4
   // Request a pressure reading w/ oversampling setting
   Wire.beginTransmission(BMP085_ADDRESS);
-  Wire.send(0xF4);
-  Wire.send(0x34 + (OSS<<6));
+  Wire.write(0xF4);
+  Wire.write(0x34 + (OSS<<6));
   Wire.endTransmission();
 
   // Wait for conversion, delay time dependent on OSS
@@ -152,16 +151,16 @@ unsigned long bmp085ReadUP()
 
   // Read register 0xF6 (MSB), 0xF7 (LSB), and 0xF8 (XLSB)
   Wire.beginTransmission(BMP085_ADDRESS);
-  Wire.send(0xF6);
+  Wire.write(0xF6);
   Wire.endTransmission();
   Wire.requestFrom(BMP085_ADDRESS, 3);
 
   // Wait for data to become available
   while(Wire.available() < 3)
     ;
-  msb = Wire.receive();
-  lsb = Wire.receive();
-  xlsb = Wire.receive();
+  msb = Wire.read();
+  lsb = Wire.read();
+  xlsb = Wire.read();
 
   up = (((unsigned long) msb << 16) | ((unsigned long) lsb << 8) | (unsigned long) xlsb) >> (8-OSS);
 

@@ -1,7 +1,7 @@
 #ifndef PUSH_H
 #define PUSH_H
 
-#include <WProgram.h>
+#include <Arduino.h>
 
 #define MAX_PUSH_ID 40
 

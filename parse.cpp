@@ -3,7 +3,7 @@
 #include "parse.h"
 #include "display.h"
 #include "push.h"
-#include "util.h"
+#include "fmt_util.h"
 
 #define WIND_DIR_LEN 3
 

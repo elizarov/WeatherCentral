@@ -3,8 +3,8 @@
 
 #include <avr/pgmspace.h>
 
-#include <WProgram.h>
-#include <Client.h>
+#include <Arduino.h>
+#include <Ethernet.h>
 #include <Metro.h>
 
 /* Data intervals */
@@ -19,27 +19,22 @@
 /* Timeout for any HTTP interaction */
 #define PUSH_TIMEOUT     30000L // 30sec
 
-#define MAX_RESPONSE 20
 #define MAX_COOKIE_LEN 20
 
 class PushDest {
 protected:  
   byte _mask;
-  byte _ip[4];
-  PGM_P _host;
+  char* _host;
+  int _port;
   PGM_P _url;
   PGM_P _auth;
   PGM_P _method;
   
-  Client _client;
   Metro _period; 
   Metro _timeout;
   
   byte _next;
   boolean _sending;
-  byte _responsePart;
-  byte _responseSize;
-  char _response[MAX_RESPONSE + 1];
 
   boolean sendPacket(byte size);  
   void parseChar(char ch);
@@ -51,7 +46,7 @@ protected:
   virtual void parseResponseHeaders(char ch) {}
   virtual void parseResponseBody(char ch) {}
 public:
-  PushDest(byte mask, byte ip0, byte ip1, byte ip2, byte ip3, int port, PGM_P host, PGM_P url, PGM_P auth);
+  PushDest(byte mask, char* host, int port, PGM_P url, PGM_P auth);
   void check();
 };
 
@@ -70,7 +65,7 @@ protected:
   virtual void parseResponseHeaders(char ch);
   virtual void parseResponseBody(char ch);
 public:  
-  PushMsgDest(byte mask, byte ip0, byte ip1, byte ip2, byte ip3, int port, PGM_P host, PGM_P url, PGM_P auth);
+  PushMsgDest(byte mask, char* host, int port, PGM_P url, PGM_P auth);
   void check();
 };
 

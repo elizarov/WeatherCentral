@@ -3,7 +3,8 @@
 #include <avr/pgmspace.h>
 
 #include "display.h"
-#include "util.h"
+#include "fmt_util.h"
+#include "xprint.h"
 
 LiquidCrystal lcd(7, 9, 2, 3, 5, 6);
 
@@ -34,6 +35,7 @@ char sStatus[MAX_SENSORS + 1];
 
 void updateDisplay(char* s) {
   // echo to console
+  waitPrint();
   Serial.print('[');
   Serial.print(s);
   Serial.println(']');

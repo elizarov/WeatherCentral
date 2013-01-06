@@ -1,7 +1,7 @@
 #ifndef BMP085_H_
 #define BMP085_H_
 
-#include <WProgram.h>
+#include <Arduino.h>
 
 void setupBMP085();
 void checkBMP085();

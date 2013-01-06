@@ -1,7 +1,7 @@
-#include <WProgram.h>
+#include <Arduino.h>
 
 #include "msgbuf.h"
-#include "util.h"
+#include "fmt_util.h"
 
 MsgBufClass MsgBuf;
 
