@@ -3,7 +3,7 @@
 
 #include <avr/pgmspace.h>
 
-const int MSGBUF_SIZE = 200;
+const int MSGBUF_SIZE = 180;
 const int MAX_MESSAGE_SIZE = 120;
 const int MESSAGE_TAG_SIZE = 5;
 
