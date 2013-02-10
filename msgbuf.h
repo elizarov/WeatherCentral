@@ -3,13 +3,13 @@
 
 #include <avr/pgmspace.h>
 
-#define MSGBUF_SIZE 180
-#define MAX_MESSAGE_SIZE 80
-#define MESSAGE_TAG_SIZE 5
+const int MSGBUF_SIZE = 200;
+const int MAX_MESSAGE_SIZE = 120;
+const int MESSAGE_TAG_SIZE = 5;
 
-#define MESSAGE_TIME_LEN 10
-#define MESSAGE_INDEX_LEN 2
-#define MAX_MESSAGE_INDEX 100
+const int MESSAGE_TIME_LEN = 10;
+const int MESSAGE_INDEX_LEN = 2;
+const int MAX_MESSAGE_INDEX = 100;
 
 class MsgBufClass {
 private:
