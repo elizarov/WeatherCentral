@@ -2,7 +2,6 @@
 
 #include "parse.h"
 #include "display.h"
-#include "push.h"
 #include "fmt_util.h"
 
 #define WIND_DIR_LEN 3
@@ -39,8 +38,6 @@ void parseTemp(byte* packet, byte len) {
   if (packet[11] != 0)
     temp = -temp;
   int humidity = 10 * packet[13] + packet[12];
-  push(ch, temp, 1);
-  push(ch + 10, humidity, 0);
 // boolean batteryOkay = (packet[7] & 0x4) == 0;
   displayBuf[0] = '0' + ch;
   formatDecimal(temp, &displayBuf[3], 5, 1 | FMT_SIGN | FMT_SPACE);
@@ -53,7 +50,6 @@ void parseRain(byte* packet, byte len) {
   long total = 100000L * packet[17] + 10000L * packet[16] + 1000 * packet[15] +
               100 * packet[14] + 10 * packet[13] + packet[12];
   int rate = 1000 * packet[11] + 100 * packet[10] + 10 * packet[9] + packet[8];
-  push(21, rate, 2);
   formatDecimal(total, &displayBuf[3], 6, FMT_SPACE);
   formatDecimal(rate, &displayBuf[10], 5, 2 | FMT_SPACE);
   parseStatus(packet);
@@ -62,7 +58,6 @@ void parseRain(byte* packet, byte len) {
 void parseUvlt(byte* packet, byte len) {
   strcpy_P(displayBuf, sUVLT);
   int uv = 10 * packet[9] + packet[8];
-  push(22, uv, 0);
   formatDecimal(uv, &displayBuf[3], 2, FMT_SPACE);
   parseStatus(packet);
 }
@@ -72,9 +67,6 @@ void parseWind(byte* packet, byte len) {
   int dir = packet[8];
   int avg = 100 * packet[16] + 10 * packet[15] + packet[14];
   int gust = 100 * packet[13] + 10 * packet[12] + packet[11];
-  push(23, dir, 0);
-  push(24, avg, 1);
-  push(25, gust, 1);
   formatDecimal(avg, &displayBuf[3], 3, FMT_SPACE);
   formatDecimal(gust, &displayBuf[7], 3, FMT_SPACE);
   memcpy_P(&displayBuf[11], WIND_DIR[dir], WIND_DIR_LEN);

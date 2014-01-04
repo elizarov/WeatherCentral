@@ -1,11 +1,10 @@
 #include <util/delay.h>
 #include <Wire.h>
-#include <Metro.h>
 
 #include "bmp085.h"
-#include "push.h"
 #include "display.h"
 #include "fmt_util.h"
+#include "Timeout.h"
 
 #define BMP085_ADDRESS 0x77  // I2C address of BMP085
 
@@ -187,7 +186,9 @@ void bmp085Calibration()
 
 //================= MAIN CODE =================
 
-Metro bmp085Period(55000L); // 55 secs
+const long PERIOD = 55000L; // 55 secs
+
+Timeout bmp085Period(PERIOD); 
 
 // POSITIONS            0123456789012345
 char sPRES[] PROGMEM = "P: -??.? ????.? ";
@@ -200,10 +201,9 @@ void setupBMP085() {
 void checkBMP085() {
   if (!bmp085Period.check())
     return;
+  bmp085Period.reset(PERIOD);
   int temperature = bmp085GetTemperature(bmp085ReadUT());
   int pressure = (int)(bmp085GetPressure(bmp085ReadUP()) / 10);
-  push(28, temperature, 1);
-  push(29, pressure, 1);
   strcpy_P(displayBuf, sPRES);
   formatDecimal(temperature, &displayBuf[3], 5, 1 | FMT_SPACE);
   formatDecimal(pressure, &displayBuf[9], 6, 1 | FMT_SPACE);

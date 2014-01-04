@@ -1,10 +1,10 @@
 #include <LiquidCrystal.h>
-#include <Metro.h>
 #include <avr/pgmspace.h>
 
 #include "display.h"
 #include "fmt_util.h"
 #include "xprint.h"
+#include "Timeout.h"
 
 LiquidCrystal lcd(7, 9, 2, 3, 5, 6);
 
@@ -15,6 +15,7 @@ const char SENSOR_CODES[] PROGMEM = " 123456789?CRUWH";
 
 #define TIMEOUT (10 * 60000L) // 10 min
 #define ANIMATION_LENGTH 2 
+#define ANIMATION_PERIOD 1000L
 
 struct Sensor {
   boolean seen;
@@ -22,7 +23,7 @@ struct Sensor {
 };
 
 Sensor sensor[MAX_SENSORS];
-Metro animationPeriod(1000, true); 
+Timeout animationPeriod(ANIMATION_PERIOD); 
 char animation[ANIMATION_LENGTH] = { ' ', '.' };
 byte animationPos;
 
@@ -67,10 +68,12 @@ void updateDisplay(char* s) {
 void checkDisplay() {
   if (!animationPeriod.check())
     return;
+  animationPeriod.reset(ANIMATION_PERIOD);
   animationPos++;
   if (animationPos == ANIMATION_LENGTH)
     animationPos = 0;
   // display animation  
   lcd.setCursor(0, 1);
   lcd.print(animation[animationPos]);
+
 }

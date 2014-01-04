@@ -4,14 +4,11 @@
 #include "OsReceiver.h"
 #include "display.h"
 #include "parse.h"
-#include "push.h"
 #include "fmt_util.h"
 #include "xprint.h"
-#include "command.h"
-#include "msgbuf.h"
 #include "bmp085.h"
 
-const char BANNER[] PROGMEM = "{W:WeatherCentral started}";
+const char BANNER[] PROGMEM = "{W:WeatherCentral started}*\r\n";
 
 // Serialize packet for WeatherStation Data Logger Software
 //void serialize(byte* packet, byte len, byte version) {
@@ -44,20 +41,15 @@ void receiveWeatherData() {
 void setup() {
   setupPrint();
   setupDisplay();
-  setupPush();
-  MsgBuf.putMessage_P(BANNER);
   OsReceiver.init();
   setupBMP085();
   waitPrint();
   print_P(BANNER);
-  Serial.println('*');
 }
 
 void loop() {
   receiveWeatherData();
   checkDisplay();
-  checkPush();
-  checkCommand();
   checkBMP085();
 }
 

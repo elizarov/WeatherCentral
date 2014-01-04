@@ -1,11 +1,10 @@
 #include "xprint.h"
+#include "Timeout.h"
 
-#include <Metro.h>
+const long INITIAL_PRINT_INTERVAL = 1000L; // wait 1 s before first print to get XBee time to initialize & join
+const long PRINT_INTERVAL         = 250L;  // wait 250 ms between prints 
 
-#define INITIAL_PRINT_INTERVAL 500L   // wait 500 ms before first print to get XBee time to initialize
-#define PRINT_INTERVAL         200L   // wait 200 ms between prints 
-
-Metro printTimeout(INITIAL_PRINT_INTERVAL);
+Timeout printTimeout(INITIAL_PRINT_INTERVAL);
 
 void setupPrint() {
   Serial.begin(57600);  
@@ -13,8 +12,7 @@ void setupPrint() {
 
 void waitPrint() {
   while (!printTimeout.check()); // just wait...
-  printTimeout.interval(PRINT_INTERVAL);
-  printTimeout.reset();
+  printTimeout.reset(PRINT_INTERVAL);
 }
 
 void waitPrintln(const char* s) {
@@ -22,7 +20,7 @@ void waitPrintln(const char* s) {
   Serial.println(s);
 }
 
-void print_P(Print& out, PGM_P str) {
+void printOn_P(Print& out, PGM_P str) {
   while (1) {
     char ch = pgm_read_byte_near(str++);
     if (!ch)
@@ -31,7 +29,7 @@ void print_P(Print& out, PGM_P str) {
   }
 }
 
-void print_P(PGM_P str) {
-  print_P(Serial, str);
+void print_P(PGM_P str) { 
+  printOn_P(Serial, str); 
 }
 
