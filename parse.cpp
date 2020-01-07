@@ -9,17 +9,17 @@
 // used for fast generation of ASCII hex strings
 const char STS_CHARS[17] PROGMEM = " ghijklmnoabcdef";
 
-const char WIND_DIR[][WIND_DIR_LEN + 1] PROGMEM = {
-  "N  ", "NNE", "NE ", "ENE", "E  ", "ESE", "SE ", "SSE", 
-  "S  ", "SSW", "SW ", "WSW", "W  ", "WNW", "NW ", "NWN" };
+//const char WIND_DIR[][WIND_DIR_LEN + 1] PROGMEM = {
+//  "N  ", "NNE", "NE ", "ENE", "E  ", "ESE", "SE ", "SSE", 
+//  "S  ", "SSW", "SW ", "WSW", "W  ", "WNW", "NW ", "NWN" };
 
-// POSITIONS            0123456789012345
-char sUNKN[] PROGMEM = "?: -------------";
-char sTEMP[] PROGMEM = "#: +??.? ??%   !";
-char sRAIN[] PROGMEM = "R: ------ --.--!";
-char sUVLT[] PROGMEM = "U: --          !";
-char sWIND[] PROGMEM = "W: --- --- --- !";
-// POSITIONS            0123456789012345
+// POSITIONS                  0123456789012345
+const char sUNKN[] PROGMEM = "?: -------------";
+const char sTEMP[] PROGMEM = "#: +??.? ??%   !";
+const char sRAIN[] PROGMEM = "R: ------ --.--!";
+const char sUVLT[] PROGMEM = "U: --          !";
+const char sWIND[] PROGMEM = "W: --- --- d-- !";
+// POSITIONS                  0123456789012345
 
 void parseStatus(byte* packet) {
   displayBuf[15] = pgm_read_byte_near(STS_CHARS + packet[7]);
@@ -69,7 +69,8 @@ void parseWind(byte* packet, byte len) {
   int gust = 100 * packet[13] + 10 * packet[12] + packet[11];
   formatDecimal(avg, &displayBuf[3], 3, FMT_SPACE);
   formatDecimal(gust, &displayBuf[7], 3, FMT_SPACE);
-  memcpy_P(&displayBuf[11], WIND_DIR[dir], WIND_DIR_LEN);
+  formatDecimal(dir, &displayBuf[12], 2, 0);
+  //memcpy_P(&displayBuf[11], WIND_DIR[dir], WIND_DIR_LEN);
   parseStatus(packet);
 }
 

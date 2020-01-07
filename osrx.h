@@ -31,5 +31,5 @@
 
 extern void osrx_init();
 extern boolean osrx_data_available();
-extern boolean get_osrx_data(byte *buffer, byte length, byte *protocol_version);
+extern byte get_osrx_data(byte *buffer, byte length, byte *protocol);
 extern void start_receiving();

@@ -190,8 +190,8 @@ const long PERIOD = 55000L; // 55 secs
 
 Timeout bmp085Period(PERIOD); 
 
-// POSITIONS            0123456789012345
-char sPRES[] PROGMEM = "P: -??.? ????.? ";
+// POSITIONS                  0123456789012345
+const char sPRES[] PROGMEM = "P: -??.? ????.? ";
 
 void setupBMP085() {
   Wire.begin();
